@@ -1,18 +1,20 @@
 defmodule Hackathon do
   @moduledoc """
-  Documentation for `Hackathon`.
+  Punto de entrada sencillo al proyecto.
+
+  Desde iex se puede usar este módulo como fachada,
+  por ejemplo para arrancar la interfaz de línea de comandos.
   """
 
   @doc """
-  Hello world.
+  Arranca la CLI en un proceso separado.
 
-  ## Examples
+  Se usa normalmente así:
 
-      iex> Hackathon.hello()
-      :world
-
+      iex -S mix
+      iex> Hackathon.start_cli()
   """
-  def hello do
-    :world
+  def start_cli do
+    Hackathon.Adapters.CLI.start()
   end
 end
