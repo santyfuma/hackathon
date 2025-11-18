@@ -15,15 +15,19 @@ defmodule Hackathon.Adapters.CLI do
   ## Punto de entrada
 
   def start do
-    IO.puts("""
-    =====================================
-      Hackathon CLI
-      Escribe /help para ver comandos.
-    =====================================
-    """)
+  IO.puts("""
+  =====================================
+    Hackathon CLI
+    Escribe /help para ver comandos.
+  =====================================
+  """)
 
-   loop(%{username: nil})
-  end
+  # Creamos un proceso listener para mensajes del chat
+  listener = spawn_link(fn -> message_listener() end)
+
+  loop(%{username: nil, listener: listener, current_room: nil})
+end
+
 
   ## Bucle principal
 
@@ -218,6 +222,68 @@ defmodule Hackathon.Adapters.CLI do
     state
   end
 
+
+
+#/chat_join
+
+defp handle_input(<<"\/chat_join ", rest::binary>>, state) do
+  room = String.trim(rest)
+
+  case state.username do
+    nil ->
+      IO.puts("Debes iniciar sesión primero (/login NOMBRE).")
+      state
+
+    username ->
+      case Hackathon.Chat.ChatHub.join(room, username, state.listener) do
+        :ok ->
+          IO.puts("Te uniste a la sala #{room}.")
+          %{state | current_room: room}
+
+        {:error, reason} ->
+          IO.puts("No se pudo unir a la sala: #{inspect(reason)}")
+          state
+      end
+  end
+end
+
+
+#/chat_send MENSAJE
+defp handle_input(<<"\/chat_send ", rest::binary>>, state) do
+  case state.current_room do
+    nil ->
+      IO.puts("No estás en ninguna sala. Usa /chat_join NOMBRE.")
+      state
+
+    room ->
+      case state.username do
+        nil ->
+          IO.puts("Debes iniciar sesión.")
+          state
+
+        username ->
+          Hackathon.Chat.ChatHub.send_message(room, username, rest)
+          state
+      end
+  end
+end
+
+
+#/chat_leave
+defp handle_input("/chat_leave", state) do
+  case state.current_room do
+    nil ->
+      IO.puts("No estás en ninguna sala.")
+      state
+
+    room ->
+      Hackathon.Chat.ChatHub.leave(room, state.listener)
+      IO.puts("Saliste de la sala #{room}.")
+      %{state | current_room: nil}
+  end
+end
+
+
   ## Entrada que no coincide con ningún comando
 
   defp handle_input(other, state) do
@@ -225,6 +291,23 @@ defmodule Hackathon.Adapters.CLI do
     IO.puts("Usa /help para ver las opciones disponibles.")
     state
   end
+
+
+
+
+# ============================================
+#  Listener: recibe mensajes enviados a la CLI
+# ============================================
+defp message_listener do
+  receive do
+    {:chat_message, room, msg} ->
+      IO.puts("\n[#{room}] #{msg.from}: #{msg.content}")
+      message_listener()
+
+    _other ->
+      message_listener()
+  end
+end
 end
 
 
