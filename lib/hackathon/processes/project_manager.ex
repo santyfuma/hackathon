@@ -10,10 +10,9 @@ defmodule Hackathon.Processes.ProjectManager do
 
   alias Hackathon.Domain.Project
   alias Hackathon.Services.ProjectService
+  alias Hackathon.Adapters.Storage
 
-  ## =================
-  ##  API PÚBLICA
-  ## =================
+  ## API pública
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -40,14 +39,12 @@ defmodule Hackathon.Processes.ProjectManager do
     GenServer.call(__MODULE__, {:get_project, team_name})
   end
 
-
-  ## =================
-  ##  CALLBACKS OTP
-  ## =================
+  ## Callbacks OTP
 
   @impl true
-  def init(initial_state) do
-    {:ok, initial_state}
+  def init(_initial_state) do
+    state = Storage.load(:projects)
+    {:ok, state}
   end
 
   @impl true
@@ -61,7 +58,7 @@ defmodule Hackathon.Processes.ProjectManager do
     else
       project = ProjectService.new_project(team_name, description, category)
       new_state = Map.put(state, team_name, project)
-
+      Storage.save(:projects, new_state)
       {:reply, {:ok, project}, new_state}
     end
   end
@@ -74,14 +71,8 @@ defmodule Hackathon.Processes.ProjectManager do
       %Project{} = project ->
         updated = ProjectService.update_status(project, new_status)
         new_state = Map.put(state, team_name, updated)
-
+        Storage.save(:projects, new_state)
         {:reply, {:ok, updated}, new_state}
     end
   end
 end
-
-# Probar ProjectManager
-
-# Hackathon.Processes.ProjectManager.create_project("team1", "Plataforma IA", "Innovación")
-# Hackathon.Processes.ProjectManager.update_status("team1", "progreso")
-# Hackathon.Processes.ProjectManager.get_project("team1")

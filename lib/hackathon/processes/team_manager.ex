@@ -4,19 +4,15 @@ defmodule Hackathon.Processes.TeamManager do
 
   Mantiene un estado interno con un mapa:
       team_name => %Team{}
-
-  Este módulo solo administra el estado; la lógica pura se
-  delega a TeamService.
   """
 
   use GenServer
 
   alias Hackathon.Domain.Team
   alias Hackathon.Services.TeamService
+  alias Hackathon.Adapters.Storage
 
-  ## =================
-  ##   API PÚBLICA
-  ## =================
+  ## API pública
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -50,15 +46,13 @@ defmodule Hackathon.Processes.TeamManager do
     GenServer.call(__MODULE__, {:get_team, name})
   end
 
-
-  ## =================
-  ##  CALLBACKS OTP
-  ## =================
+  ## Callbacks OTP
 
   @impl true
-  def init(initial_state) do
-    # Estado inicial: %{"equipo1" => %Team{}, ...}
-    {:ok, initial_state}
+  def init(_initial_state) do
+    # Cargamos desde disco al iniciar
+    state = Storage.load(:teams)
+    {:ok, state}
   end
 
   @impl true
@@ -78,6 +72,7 @@ defmodule Hackathon.Processes.TeamManager do
       false ->
         team = TeamService.new_team(name, category)
         new_state = Map.put(state, name, team)
+        Storage.save(:teams, new_state)
         {:reply, {:ok, team}, new_state}
     end
   end
@@ -90,18 +85,8 @@ defmodule Hackathon.Processes.TeamManager do
       %Team{} = team ->
         updated = TeamService.add_member(team, username)
         new_state = Map.put(state, team_name, updated)
-
+        Storage.save(:teams, new_state)
         {:reply, {:ok, updated}, new_state}
     end
   end
 end
-
-
-
-# Probar TeamManager
-
-# Hackathon.Processes.TeamManager.create_team("team1", "categoria1")
-# Hackathon.Processes.TeamManager.join_team("team1", "juan")
-# Hackathon.Processes.TeamManager.list_teams()
-# Hackathon.Processes.TeamManager.get_team("team1")
-
